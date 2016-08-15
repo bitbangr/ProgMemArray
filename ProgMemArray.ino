@@ -90,6 +90,8 @@ void loop()
   {
     byte tmpByte = pgm_read_byte(&thread_Points[i])  ; // lets just try to read stuff - bytes munged to character kinda.
 
+    // 200 hooks total at 1.8 degrees between each hook.
+    // gives us 5 hooks per pair of LEDs spaced out on an WS8212B led strip wrapped around 22" dia bicycle rim.
     currentPoint = ((uint8_t) tmpByte) /5 ;
 
   if (true)
