@@ -36,15 +36,16 @@
 //   NEO_GRB     Pixels are wired for GRB bitstream (most NeoPixel products)
 //   NEO_RGB     Pixels are wired for RGB bitstream (v1 FLORA pixels, not v2)
 // currently using 51 pins for a 22" dia bicycle wheel with 200 points
-Adafruit_NeoPixel strip = Adafruit_NeoPixel(51, PIN, NEO_GRB + NEO_KHZ800);
+Adafruit_NeoPixel strip = Adafruit_NeoPixel(51, PIN, NEO_GRB + NEO_KHZ800);  // 51 is indeed the correct number of LEDS spaced at one at every fifth hook around a 22" dia wheel using WS2812B RGB LED strip
 
 uint8_t lastPoint = 0; // last point set
 uint8_t currentPoint ;  // current point to set
-uint16_t wait = 4000;
+uint8_t firstPixel = 0;
+uint8_t lastPixel = 50;  // 51-1 (total pixels - 1) as we are doing zero based indexing into strip
 
-uint8_t testPoints = 50 ;
+uint16_t wait = 4000;
 uint8_t totalPoints = 200;
-boolean debug = false;
+boolean debug = true;
 
 
 #include <avr/pgmspace.h>
@@ -62,10 +63,12 @@ const byte thread_Points[] PROGMEM = {0x7E, 0xBD, 0xB2, 0xBF, 0xB4, 0xC0, 0xB1, 
 
 void setup()
 {
-  // pumping back everything over the serial port to verify debug
-  Serial.begin(115200);
-  while (!Serial);
-  Serial.println("OK");
+  if (debug) {
+    // pumping back everything over the serial port to verify debug
+    Serial.begin(115200);
+    while (!Serial);
+    Serial.println("OK");
+  }
 
   strip.begin();
   strip.show(); // Initialize all pixels to 'off'
@@ -78,125 +81,134 @@ void loop()
      The strcpy_P function copies a string from program space to a string in RAM ("buffer").
      Make sure your receiving string in RAM  is large enough to hold whatever
      you are retrieving from program space. */
-
-
-  //  colorWipe(strip.Color(0, 0, 255), 50); // Red
-  //  delay( 1500 );
-
-
+  if (debug) {
+    // testLedEdgeCase();
+    //testColorPairs(10);
+  }
+  // Iterate through our array of input data
   lastPoint = (uint8_t) 0; // initialize for first time
   for (int i = 0; i < 3500; i++)
-  //for (int i = 0; i < 100 ; i++)
+    //for (int i = 0; i < 100 ; i++)
   {
     byte tmpByte = pgm_read_byte(&thread_Points[i])  ; // lets just try to read stuff - bytes munged to character kinda.
 
     // 200 hooks total at 1.8 degrees between each hook.
     // gives us 5 hooks per pair of LEDs spaced out on an WS8212B led strip wrapped around 22" dia bicycle rim.
-    currentPoint = ((uint8_t) tmpByte) /5 ;
+    // note that the assumption is that only valid data points from 0 to 199 exist in the input array
+    currentPoint = ((uint8_t) tmpByte) / 5 ;
 
-  if (true)
-  {
-    Serial.println("----------");
-    Serial.print( i );
-    Serial.print(" ");
-    Serial.println(tmpByte);
-    delay( 20 );
-  }  
+    if (debug)
+    {
+      Serial.println("----------");
+      Serial.print( i );
+      Serial.print(" ");
+      Serial.println(tmpByte);
+      delay( 20 );
+    }
 
     if (lastPoint < currentPoint) {
-       colorPairWipeCounterClockwise(strip.Color(0, 255, 0), lastPoint, currentPoint, 20) ; // color, start, stop, wait   
-        setGreenRed(currentPoint); // ??
+      colorWipeCounterClockwise(strip.Color(0, 60, 0), lastPoint, currentPoint, 20) ; // color, start, stop, wait
+      //setGreenRed(currentPoint); // need to determine correct colour pair to display
+      setColorPair(currentPoint);
     }
-    else  // (lastPoint > currentPoint)  
-    { 
-      colorPairWipeClockwise(strip.Color(0, 255, 0), lastPoint, currentPoint, 20) ; // color, start, stop, wait   
-       setGreenRed(currentPoint-1); //??  Why is this off by one?
-    }
-    lastPoint=currentPoint;
-
-    if (lastPoint >= 50)
+    else  // (lastPoint > currentPoint)
     {
-      Serial.println("lastPoint >= 50");
-      Serial.println(lastPoint);
-      Serial.println(currentPoint);
-      Serial.println(tmpByte);
-      delay(250);
-    }else if (currentPoint >= 50){
-      Serial.println("currentPoint >= 50");
-      Serial.println(lastPoint);
-      Serial.println(currentPoint);
-      Serial.println(tmpByte);
-      delay(250);
+      colorWipeClockwise(strip.Color(0, 60, 0), lastPoint, currentPoint, 20) ; // color, start, stop, wait
+      //setGreenRed(currentPoint); // need to determine correct colour pair to display
+      setColorPair(currentPoint);
+    }
+    lastPoint = currentPoint;
+
+    if (debug)
+    {
+      if (lastPoint >= 50)
+      {
+        Serial.println("lastPoint >= 50");
+      } else if (currentPoint >= 50) {
+        Serial.println("currentPoint >= 50");
       }
-     else if (currentPoint <= 0){
-      Serial.println("currentPoint <= 0");
-      Serial.println(lastPoint);
-      Serial.println(currentPoint);
-      Serial.println(tmpByte);
-      delay(250);
+      else if (currentPoint <= 0) {
+        Serial.println("currentPoint <= 0");
+        delay(250);
       }
-      else if (tmpByte == byte(0)){
-      Serial.println("tmpByte <= 0");
-      Serial.println(lastPoint);
-      Serial.println(currentPoint);
-      Serial.println(tmpByte);
-      delay(250);
+      else if (tmpByte == byte(0)) {
+        Serial.println("tmpByte <= 0");
+        delay(250);
       }
 
-      
-    delay(100);
+      Serial.println(lastPoint);
+      Serial.println(currentPoint);
+      Serial.println(tmpByte);
+      delay(250);
+    }
+    delay(1000);
   }
-
-  // need to handle case where current point is 0 and previous point will be 50.
-
-//
-//    colorPairWipeCounterClockwise(strip.Color(0, 255, 0), 0, 9, 50) ; // color, start, stop, wait
-//  
-//    setGreenRed(9);
-//    delay(3000);
-//  
-//    clearPair(9);
-//    delay(3000);
-//  
-//    colorPairWipeClockwise(strip.Color(0, 255, 0), 45, 20, 50) ; // color, start, stop, wait
-//  
-//    setBlueYellow(19);
-//    delay(3000);
-//  
-//    clearPair(19);
-//    delay(3000);
-//
-
-
-  //  serialDebugPrint();
-  //
-  //  exit(0);
 
 }
 
 
 
-// Serial Debug Prin/
+
 void serialDebugPrint()
 {
 
-  Serial.println("start");
+  if (debug) {
+    Serial.println("start");
 
-  for (int i = 0; i < 3500; i++)
-  {
-    //    //strcpy_P(buffer, (char*)pgm_read_word(&(string_table[i]))); // Necessary casts and dereferencing, just copy.
-
-    byte tmpByte = pgm_read_byte(&thread_Points[i])  ; // lets just try to read stuff - bytes munged to character kinda.
-
-    // save some time on the serial port text banging
-    if ((i < 100) || (i > 3400))
+    for (int i = 0; i < 3500; i++)  // Set this to size of input Array
     {
-      Serial.println(tmpByte);
-      delay( 125 );
+      // strcpy_P(buffer, (char*)pgm_read_word(&(string_table[i]))); // Necessary casts and dereferencing, just copy.
+      byte tmpByte = pgm_read_byte(&thread_Points[i])  ; // lets just try to read stuff - bytes munged to character kinda.
+
+      // save some time on the serial port text banging
+      if ((i < 100) || (i > 3400))
+      {
+        Serial.println(tmpByte);
+        delay( 125 );
+      }
     }
+
+    Serial.println("end" );
+
+
+    //      Serial.println("tmpByte <= 0");
+    //      Serial.println(lastPoint);
+    //      Serial.println(currentPoint);
+    //      Serial.println(tmpByte);
   }
 
-  Serial.println("end" );
+}
+
+/*
+   Set the corresponding color pair based on the current point
+   5 Hooks per pair of LEDs
+   Hooks 0,4,8,12,16,20 ...   all fall on (or really close) to an LED
+   Hooks 1,5,9,13,17,21 ...   all fall to the immediate right of the leftmost LED of the pair
+   Hooks 2,6,10,14,18,22 ...  all fall in center of pairs of LEDS
+   Hooks 3,7,11,15,19,23 ...  all fall to the immediate left of the rightmost LED of the pair
+
+   We use point modulus 4 to get the remainder to determe which color pair we select for the given point
+*/
+
+void setColorPair(uint8_t i) {
+
+  int remainder = i % 4;
+  switch (remainder) {
+    case 0:
+      //setGreenRed(i);
+      //setGreenWhite(i);
+      setWhite(i);  // Just select one led as that is what we do
+      break;
+    case 1:
+      setBluePurple(i);
+      break;
+    case 2:
+      setRedPair(i);
+      break;
+    case 3:
+      setPurpleBlue(i);
+      break;
+  }
 
 
 }
@@ -217,18 +229,28 @@ void colorWipe(uint32_t c, uint8_t wait) {
 /*
    Clear the current pair of pixels
 */
-void  clearPair(uint16_t i) {
+void  clearPair(uint8_t i) {
   strip.setPixelColor(i, 0, 0, 0);
-  strip.setPixelColor(i + 1 , 0, 0, 0);
+  strip.setPixelColor(i + 1 , 0, 0, 0);  // if this is edge case we are setting lastPixel + 1 which will never show
+
+  // edge case where we are at last pixel and need to wrap to first
+  if (i == lastPixel)
+    strip.setPixelColor(firstPixel , 0, 0, 0);
+
   strip.show();
 }
 
 /*
    Set the pair of pixels to Green (i) Red (i+1)
 */
-void setGreenRed(uint16_t i) {
+void setGreenRed(uint8_t i) {
   strip.setPixelColor(i, 0, 255, 0);
-  strip.setPixelColor(i + 1, 255, 0, 0);
+  strip.setPixelColor(i + 1, 255, 0, 0);  // if this is edge case we are setting lastPixel + 1 which will never show
+
+  // edge case where we are at last pixel and need to wrap to first
+  if (i == lastPixel)
+    strip.setPixelColor(firstPixel , 255, 0, 0);
+
   strip.show();
 }
 
@@ -236,114 +258,190 @@ void setGreenRed(uint16_t i) {
 /*
    Set the pair of pixels to Red (i) Green (i+1)
 */
-void setRedGreen (uint16_t i) {
+void setRedGreen (uint8_t i) {
   strip.setPixelColor(i, 20, 0, 0);
   strip.setPixelColor(i + 1, 0, 20, 0);
+
+  // edge case where we are at last pixel and need to wrap to first
+  if (i == lastPixel)
+    strip.setPixelColor(firstPixel , 0 , 20, 0);
   strip.show();
 }
+
+/*
+   Set the pair of pixels to Green (i) White (i+1)
+*/
+void setGreenWhite(uint8_t i) {
+  strip.setPixelColor(i, 0, 255, 0);
+  strip.setPixelColor(i + 1, 90, 90, 30);  // if this is edge case we are setting lastPixel + 1 which will never show
+
+  // edge case where we are at last pixel and need to wrap to first
+  if (i == lastPixel)
+    strip.setPixelColor(firstPixel , 90, 90, 30);
+
+  strip.show();
+}
+
+/*
+   Set the the single pixel to White (i)
+*/
+void setWhite(uint8_t i) {
+  strip.setPixelColor(i, 90, 90, 30);  // if this is edge case we are setting lastPixel + 1 which will never show
+   strip.setPixelColor(i + 1, 0, 0, 0);
+  strip.show();
+}
+
+
 
 
 /*
    Set the pair of pixels to Red (i) Red  (i+1)
 */
-void setRedPair (uint16_t i) {
+void setRedPair (uint8_t i) {
   strip.setPixelColor(i, 20, 0, 0);
   strip.setPixelColor(i + 1, 20, 0 , 0);
-  strip.show();
-}
 
-
-/*
-   Set the pair of pixes to Blue(i) and Yellow (i+1)
-*/
-void setBlueYellow(uint16_t i) {
-  strip.setPixelColor(i, 0, 0, 20);
-  strip.setPixelColor(i + 1, 20, 20, 0);
+  // edge case where we are at last pixel and need to wrap to first
+  if (i == lastPixel)
+    strip.setPixelColor(firstPixel , 20 , 0, 0);
   strip.show();
 }
 
 /*
-   Set the pair of pixes to Yellow(i) and Blue (i+1)
+   Set the pair of pixels to Blue(i) and Purple (i+1)
 */
-void setYellowBlue (uint16_t i) {
-  strip.setPixelColor(i, 20, 20, 0);
-  strip.setPixelColor(i + 1, 0, 0, 20);
-  strip.show();
-}
-
-/*
-   Set the pair of pixes to Blue(i) and Purple (i+1)
-*/
-void setBluePurple(uint16_t i) {
+void setBluePurple(uint8_t i) {
   strip.setPixelColor(i, 0, 0, 20);
   strip.setPixelColor(i + 1, 10, 0, 10);
+  if (i == lastPixel)
+    strip.setPixelColor(firstPixel , 10 , 20, 10);
+
   strip.show();
+
 }
 
 /*
-   Set the pair of pixes to Purple(i) and Blue (i+1)
+   Set the pair of pixels to Purple(i) and Blue (i+1)
 */
-void setPurpleBlue (uint16_t i) {
+void setPurpleBlue (uint8_t i) {
   strip.setPixelColor(i, 10, 0, 10);
   strip.setPixelColor(i + 1, 0, 0, 20);
+  if (i == lastPixel)
+    strip.setPixelColor(firstPixel , 0 , 0, 20);
+
   strip.show();
+
 }
 
-//// Fill the dots one after the other with a color
-//// Used to indicate direction of next closest thread to be wound
-//void colorWipe(uint32_t c, uint8_t wait, uint8_t start, uint8_t stop) {
-//
-//  if (start < stop) // clockwise
-//  {
-//    for (uint16_t i = start; i <= stop; i++) {
-//      strip.setPixelColor(i, c);
-//      strip.show();
-//      delay(wait);
-//    }
-//  }
-//  else // Start >  stop // counter clockwise
-//  {
-//    for (uint16_t i = start; i >= stop; i--) {
-//      strip.setPixelColor(i, c);
-//      strip.show();
-//      delay(wait);
-//    }
-//  }
-//}
 
-// Set chasing pair of pixels
-void colorPairWipeCounterClockwise(uint32_t c, uint8_t start, uint8_t stop, uint16_t wait) {
+/*
+    Counter Clockwise pixel chaser for indicating where next thread to be wound
+*/
+void colorWipeCounterClockwise(uint32_t c, uint8_t start, uint8_t stop, uint16_t wait) {
 
- Serial.println("-------CCW---------");
-      Serial.print(start);
-      Serial.print(" ");
-      Serial.println(stop);
+  if (debug) {
+    Serial.println("-------CCW---------");
+    Serial.print(start);
+    Serial.print(" ");
+    Serial.println(stop);
+  }
 
-
-  for (int i = start; i <= stop; i++) {
+  for (int i = start; i <= stop; i++) {  // when you decrement an unsigned int from 0 it goes to 255 not -1 whoops!
     strip.setPixelColor(i - 1, 0, 0, 0);
     strip.setPixelColor(i, c);
     strip.setPixelColor(i + 1, c);
     strip.show();
+
+    if (debug)
       Serial.println(i);
+
     delay(wait);
   }
 }
 
 
-void colorPairWipeClockwise(uint32_t c, uint8_t start, uint8_t stop, uint16_t wait) {
-  Serial.println("-------CW---------");
-      Serial.print(start);
-      Serial.print(" ");
-      Serial.println(stop);
+/*
+   Clockwise pixel chaser for indicating where next thread to be wound
+*/
+void colorWipeClockwise(uint32_t c, uint8_t start, uint8_t stop, uint16_t wait) {
 
-  for (int i = start; i >= stop; i--) { // when you decrement an unsigned int from 0 it goes to 255 not -1 whoops!
+  if (debug) {
+    Serial.println("-------CW---------");
+    Serial.print(start);
+    Serial.print(" ");
+    Serial.println(stop);
+  }
+
+  for (int i = start; i > stop; i--) { // i greater but not equal to stop for Clockwise Wipe
     strip.setPixelColor(i + 1, 0, 0, 0);
     strip.setPixelColor(i, c);
     strip.setPixelColor(i - 1, c);
     strip.show();
+
+    if (debug)
       Serial.println(i);
+
     delay(wait);
   }
+}
+
+/*
+    Test the edge case of first and last pixel to make sure it is properly marked on wheel
+*/
+void testLedEdgeCase() {
+
+  colorWipe(strip.Color(0, 100, 100), 50); //
+  delay( 1500 );
+
+  // first 5 pairs
+  for (int i = firstPixel; i <= 4; i++)
+  {
+
+    setGreenRed(i);
+    delay(1000);
+
+    clearPair(i);
+    delay(1000);
+  }
+
+  colorWipe(strip.Color(100, 100, 0), 50); //
+  delay( 1500 );
+
+  // Last 5 pairs
+  for (int i = 46; i <= lastPixel; i++)
+  {
+    setGreenRed(i);
+    delay(1000);
+
+    clearPair(i);
+    delay(1000);
+  }
+
+  colorWipe(strip.Color(0, 0, 0), 50); //
+  delay(5000);
+}
+
+
+/*
+     Test Eddge Pairs
+*/
+void testColorPairs(uint8_t i) {
+
+  setGreenRed(i);   // 0 point, ie 0 , 4 , 12 ,16 , 20
+  setRedGreen(i + 4 );  // don't need this one
+
+  setPurpleBlue(i + 16);
+  setBluePurple(i + 20);
+
+  setRedPair(i + 24);
+
+  setGreenWhite (i + 28);
+
+  delay(6000);
+
+
+  exit(0);
+  //colorWipeCounterClockwise(strip.Color(0, 255, 0), 51, 0, 50) ; // color, start, stop, wait
+
 }
 
